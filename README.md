@@ -56,12 +56,11 @@ python -m ipykernel install --user --name projeto-fraude --display-name "Projeto
 
 ---
 
-## 3. Rodar só a tela (o caminho mais rápido)
+## 3. Rodar a tela
 
-Para a tela funcionar, só falta o arquivo do modelo. Ele não fica no GitHub, porque é grande.
+O modelo treinado (`modelos/modelo_fraude.joblib`), as transações da demo e os gráficos já vêm junto com o projeto. Não é preciso baixar a base nem rodar notebook.
 
-1. **Peça o arquivo `modelo_fraude.joblib`** para o Eduardo e coloque em `modelos/modelo_fraude.joblib`. (Se preferir gerar o seu, siga a seção 4.)
-2. Na raiz do projeto, com o `(venv)` ativo:
+1. Na raiz do projeto, com o `(venv)` ativo:
 
 ```bash
 python manage.py migrate
@@ -70,7 +69,7 @@ python manage.py runserver
 
 O `migrate` só precisa ser rodado na primeira vez.
 
-3. Abra **http://127.0.0.1:8000/** no navegador. Deixe o terminal aberto enquanto usa a tela. Para desligar, use `Ctrl+C`.
+2. Abra **http://127.0.0.1:8000/** no navegador. Deixe o terminal aberto enquanto usa a tela. Para desligar, use `Ctrl+C`.
 
 A tela tem três abas:
 
@@ -84,7 +83,9 @@ A tela funciona sem internet.
 
 ---
 
-## 4. Rodar os notebooks (refazer a análise e o modelo)
+## 4. Rodar os notebooks (opcional: refazer a análise e o modelo)
+
+Só é necessário para quem quiser reproduzir a análise. A tela funciona sem isso.
 
 ### 4.1 Baixar a base de dados
 
@@ -112,7 +113,7 @@ O `03_analise_completa.ipynb` leva alguns minutos e gera:
 - `demo/transacoes_demo.csv`: as transações da simulação.
 - `resultados/`: gráficos e tabelas usados no relatório e na tela.
 
-Como tudo usa `random_state=42`, rodar de novo dá sempre os mesmos resultados.
+Como tudo usa `random_state=42`, rodar de novo dá sempre os mesmos resultados. Por isso, se depois de rodar o Git mostrar esses arquivos como modificados, não é preciso commitá-los: descarte com `git restore modelos demo resultados`.
 
 ---
 
@@ -123,7 +124,7 @@ Projeto-Fraude/
 ├── data/                  # creditcard.csv (não vai para o GitHub)
 ├── notebooks/             # análise e modelagem
 ├── ml/                    # código do modelo (pontuar.py carrega e usa o modelo)
-├── modelos/               # modelo treinado (não vai para o GitHub)
+├── modelos/               # modelo treinado usado pela tela
 ├── demo/                  # transações usadas na simulação
 ├── resultados/            # gráficos e tabelas gerados pelos notebooks
 ├── monitor/               # app Django da tela (views, templates, JS e CSS)
@@ -143,7 +144,7 @@ Projeto-Fraude/
 | `No module named 'matplotlib'` (ou outra biblioteca) no notebook | O notebook está usando o Python errado. Selecione o kernel **Projeto Fraude (venv)**. |
 | "Running cells with Python requires the ipykernel package" | Mesmo caso: kernel errado. Não instale nada no Python do sistema; escolha o kernel do venv. |
 | Kernel não inicia (timeout) | Atualize as extensões Python e Jupyter do VS Code e recarregue a janela (`Ctrl/Cmd+Shift+P` → *Developer: Reload Window*). |
-| A tela mostra "Modelo não encontrado" | Falta o `modelos/modelo_fraude.joblib`. Peça o arquivo ou rode o notebook 03. |
+| A tela mostra "Modelo não encontrado" | Falta o `modelos/modelo_fraude.joblib`. Rode `git pull` na branch `staging`. |
 | A página mostra o foguete do Django | O código da tela não está no seu projeto. Rode `git pull` na branch `staging`. |
 | Erro ao carregar o modelo (`joblib.load`) | Versões diferentes de Python ou scikit-learn. Reinstale com `python -m pip install -r requirements.txt` e use a mesma versão de Python. |
 | `Error: That port is already in use` | Já tem um servidor rodando. Feche o outro terminal ou use `python manage.py runserver 8001`. |
