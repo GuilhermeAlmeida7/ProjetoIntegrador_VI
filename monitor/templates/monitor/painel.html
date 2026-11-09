@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Monitor de Fraudes</title>
-  <link rel="stylesheet" href="{% static 'monitor/painel.css' %}">
+  <link rel="stylesheet" href="{% static 'monitor/painel.css' %}?v=2">
 </head>
 <body>
 <header class="topo">
@@ -70,7 +70,7 @@
           <h2>Transações chegando</h2>
           <span class="cartao-sub">Cada transação é enviada ao modelo, que devolve o score na hora</span>
         </div>
-        <div class="tabela-rolagem">
+        <div class="tabela-rolagem feed-rolagem" id="feed-rolagem">
           <table class="tabela">
             <thead>
               <tr><th>Chegada</th><th>ID</th><th class="num">Valor</th><th class="num">Score</th><th>Decisão</th><th>Real</th><th>Resultado</th></tr>
@@ -198,7 +198,7 @@
 {% if not erro %}
 {{ config|json_script:"config" }}
 <script src="{% static 'monitor/chart.umd.js' %}"></script>
-<script src="{% static 'monitor/painel.js' %}"></script>
+<script src="{% static 'monitor/painel.js' %}?v=2"></script>
 {% endif %}
 </body>
 </html>

@@ -5,7 +5,6 @@
   const config = JSON.parse(document.getElementById("config").textContent);
   const $ = (id) => document.getElementById(id);
 
-  const MAX_FEED = 12;
   const MAX_PONTOS = 80;
 
   const estado = {
@@ -94,48 +93,66 @@
   }
 
   // ---------------------------------------------------------------- feed
+  function criarLinhaFeed(item, destacar) {
+    const r = resultado(item);
+    const linha = document.createElement("tr");
+    if (item.classeReal === 1) linha.classList.add("linha-fraude");
+    if (destacar) linha.classList.add("nova");
+    const celulas = [
+      [item.chegada, ""],
+      [item.id, ""],
+      [fmtEuro(item.valor), "num"],
+      [fmtScore(item.score), "num"],
+    ];
+    celulas.forEach(([texto, classe]) => {
+      const td = document.createElement("td");
+      td.textContent = texto;
+      if (classe) td.className = classe;
+      linha.appendChild(td);
+    });
+    const decisao = document.createElement("td");
+    const pilula = document.createElement("span");
+    pilula.className = "pilula " + (r.suspeita ? "pilula-suspeita" : "pilula-aprovada");
+    pilula.textContent = r.suspeita ? "Suspeita" : "Aprovada";
+    decisao.appendChild(pilula);
+    linha.appendChild(decisao);
+
+    const real = document.createElement("td");
+    real.textContent = item.classeReal === 1 ? "Fraude" : "Normal";
+    linha.appendChild(real);
+
+    const res = document.createElement("td");
+    res.className = r.classe;
+    res.textContent = r.texto;
+    linha.appendChild(res);
+    return linha;
+  }
+
+  // Mostra todo o histórico (mais recente no topo). Quando chega uma transação
+  // nova, só insere a linha dela; nos demais casos (ex.: mudou o limite) redesenha.
   function atualizarFeed(novo) {
     const corpo = $("feed");
-    if (!estado.historico.length) {
+    const hist = estado.historico;
+    if (!hist.length) {
       corpo.innerHTML = '<tr class="vazio"><td colspan="7">Clique em <strong>Iniciar simulação</strong> para começar.</td></tr>';
       return;
     }
-    const recentes = estado.historico.slice(-MAX_FEED).reverse();
+    if (novo && corpo.children.length === hist.length - 1 && !corpo.querySelector("tr.vazio")) {
+      const anterior = corpo.querySelector("tr.nova");
+      if (anterior) anterior.classList.remove("nova");
+      const rolagem = $("feed-rolagem");
+      const alturaAntes = rolagem.scrollHeight;
+      corpo.insertBefore(criarLinhaFeed(hist[hist.length - 1], true), corpo.firstChild);
+      // Se o usuário rolou para baixo, mantém a posição em vez de pular.
+      if (rolagem.scrollTop > 0) rolagem.scrollTop += rolagem.scrollHeight - alturaAntes;
+      return;
+    }
+    const fragmento = document.createDocumentFragment();
+    for (let i = hist.length - 1; i >= 0; i--) {
+      fragmento.appendChild(criarLinhaFeed(hist[i], novo && i === hist.length - 1));
+    }
     corpo.innerHTML = "";
-    recentes.forEach((item, posicao) => {
-      const r = resultado(item);
-      const linha = document.createElement("tr");
-      if (item.classeReal === 1) linha.classList.add("linha-fraude");
-      if (novo && posicao === 0) linha.classList.add("nova");
-      const celulas = [
-        [item.chegada, ""],
-        [item.id, ""],
-        [fmtEuro(item.valor), "num"],
-        [fmtScore(item.score), "num"],
-      ];
-      celulas.forEach(([texto, classe]) => {
-        const td = document.createElement("td");
-        td.textContent = texto;
-        if (classe) td.className = classe;
-        linha.appendChild(td);
-      });
-      const decisao = document.createElement("td");
-      const pilula = document.createElement("span");
-      pilula.className = "pilula " + (r.suspeita ? "pilula-suspeita" : "pilula-aprovada");
-      pilula.textContent = r.suspeita ? "Suspeita" : "Aprovada";
-      decisao.appendChild(pilula);
-      linha.appendChild(decisao);
-
-      const real = document.createElement("td");
-      real.textContent = item.classeReal === 1 ? "Fraude" : "Normal";
-      linha.appendChild(real);
-
-      const res = document.createElement("td");
-      res.className = r.classe;
-      res.textContent = r.texto;
-      linha.appendChild(res);
-      corpo.appendChild(linha);
-    });
+    corpo.appendChild(fragmento);
   }
 
   // ---------------------------------------------------------------- gráfico
