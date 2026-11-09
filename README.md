@@ -6,6 +6,8 @@ Modelo de detecção de anomalias (LOF e Isolation Forest) treinado no dataset C
 
 Este guia mostra como rodar tudo do zero: o ambiente, os notebooks e a tela.
 
+A explicação do projeto (dados, métricas, modelos, resultados e decisões técnicas) está em [docs/](docs/README.md).
+
 ---
 
 ## O que você precisa ter instalado
@@ -128,6 +130,7 @@ Projeto-Fraude/
 ├── demo/                  # transações usadas na simulação
 ├── resultados/            # gráficos e tabelas gerados pelos notebooks
 ├── monitor/               # app Django da tela (views, templates, JS e CSS)
+├── docs/                  # documentação do projeto
 ├── projetointegrador_vi/  # configurações do Django
 ├── login/                 # app Django do grupo
 ├── manage.py
