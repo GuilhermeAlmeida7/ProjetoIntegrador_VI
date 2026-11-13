@@ -3,31 +3,45 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Monitor de Fraudes</title>
-  <link rel="stylesheet" href="{% static 'monitor/painel.css' %}?v=2">
+  <title>VigIA — Central de Auditoria & Resultados</title>
+  <link rel="stylesheet" href="{% static 'monitor/painel.css' %}?v=8">
 </head>
 <body>
 <header class="topo">
   <div class="topo-conteudo">
     <div class="marca">
-      <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-           stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#38BDF8" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
         <path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6l8-3z"></path><path d="M9 12l2 2 4-4"></path>
       </svg>
       <div>
-        <p class="marca-titulo">Monitor de Fraudes</p>
-        <p class="marca-sub">Credit Card Fraud Detection{% if not erro %} · modelo {{ nome_modelo }} com {{ colunas|length }} colunas{% endif %}</p>
+        <p class="marca-titulo">VigIA — Central de Auditoria de Fraudes</p>
+        <p class="marca-sub">Credit Card Fraud Detection · Modelo {{ nome_modelo }} ({{ colunas|length }} colunas PCA)</p>
       </div>
     </div>
     {% if not erro %}
-    <nav class="abas" role="tablist" aria-label="Seções">
-      <button class="aba-botao" role="tab" aria-selected="true" aria-controls="aba-ao-vivo" data-aba="aba-ao-vivo">Ao vivo</button>
-      <button class="aba-botao" role="tab" aria-selected="false" aria-controls="aba-testar" data-aba="aba-testar">Testar transação</button>
-      <button class="aba-botao" role="tab" aria-selected="false" aria-controls="aba-resultados" data-aba="aba-resultados">Resultados do modelo</button>
+    <nav class="abas" role="tablist">
+      <button class="aba-botao" role="tab" aria-selected="true" data-aba="aba-ao-vivo">Ao Vivo</button>
+      <button class="aba-botao" role="tab" aria-selected="false" data-aba="aba-testar">Simulador & Validador</button>
+      <button class="aba-botao" role="tab" aria-selected="false" data-aba="aba-resultados">Resultados do Modelo</button>
     </nav>
     {% endif %}
   </div>
 </header>
+
+{% if not erro %}
+<!-- Ticker da Bolsa / Painel de Alta Frequência -->
+<div class="ticker-container" aria-hidden="true">
+  <div class="ticker-track">
+    <div class="ticker-item"><span class="ticker-label">ANALISADAS</span><span class="ticker-val ciano" id="ticker-analisadas">0</span></div>
+    <div class="ticker-item"><span class="ticker-label">ALERTAS</span><span class="ticker-val amarelo" id="ticker-alertas">0</span></div>
+    <div class="ticker-item"><span class="ticker-label">FRAUDES</span><span class="ticker-val rosa" id="ticker-fraudes">0/0 ▲</span></div>
+    <div class="ticker-item"><span class="ticker-label">FALSOS ALARMES</span><span class="ticker-val amarelo" id="ticker-falsos">0 ▼</span></div>
+    <div class="ticker-item"><span class="ticker-label">CAPITAL PROTEGIDO</span><span class="ticker-val verde" id="ticker-valor">R$ 0</span></div>
+    <div class="ticker-item"><span class="ticker-label">CORTE</span><span class="ticker-val ciano" id="ticker-corte">0,000</span></div>
+    <div class="ticker-item"><span class="ticker-label">LATÊNCIA</span><span class="ticker-val ciano" id="ticker-latencia">0,0 ms</span></div>
+  </div>
+</div>
+{% endif %}
 
 <main class="conteudo">
 {% if erro %}
@@ -39,107 +53,115 @@
 
   <!-- ============================== AO VIVO ============================== -->
   <section id="aba-ao-vivo" class="aba" role="tabpanel">
-    <div class="barra-controles">
-      <div class="grupo-botoes">
-        <button id="btn-rodar" class="botao botao-principal">Iniciar simulação</button>
-        <button id="btn-reiniciar" class="botao">Reiniciar</button>
-        <label class="campo-velocidade">Velocidade
-          <select id="velocidade">
-            <option value="1000">1 por segundo</option>
-            <option value="500" selected>2 por segundo</option>
-            <option value="200">5 por segundo</option>
-          </select>
-        </label>
-      </div>
-      <p class="status"><span id="status-ponto" class="status-ponto"></span><span id="status-texto">Pausado</span></p>
-    </div>
-    <p class="nota" id="nota-demo"></p>
-
-    <div class="kpis">
-      <div class="kpi"><span class="kpi-rotulo">Transações analisadas</span><span class="kpi-valor" id="kpi-analisadas">0</span><span class="kpi-detalhe" id="kpi-tempo">&nbsp;</span></div>
-      <div class="kpi"><span class="kpi-rotulo">Alertas gerados</span><span class="kpi-valor" id="kpi-alertas">0</span><span class="kpi-detalhe">transações marcadas como suspeitas</span></div>
-      <div class="kpi kpi-bom"><span class="kpi-rotulo">Fraudes pegas</span><span class="kpi-valor" id="kpi-pegas">0</span><span class="kpi-detalhe" id="kpi-pegas-detalhe">&nbsp;</span></div>
-      <div class="kpi kpi-ruim"><span class="kpi-rotulo">Fraudes que passaram</span><span class="kpi-valor" id="kpi-passaram">0</span><span class="kpi-detalhe">aprovadas sem alerta</span></div>
-      <div class="kpi kpi-alerta"><span class="kpi-rotulo">Falsos alarmes</span><span class="kpi-valor" id="kpi-falsos">0</span><span class="kpi-detalhe" id="kpi-falsos-detalhe">&nbsp;</span></div>
-      <div class="kpi"><span class="kpi-rotulo">Valor protegido</span><span class="kpi-valor" id="kpi-valor">€ 0</span><span class="kpi-detalhe" id="kpi-valor-detalhe">&nbsp;</span></div>
-    </div>
-
     <div class="linha">
+      <!-- Tape de Transações (Esquerda com histórico acumulado e scroll completo) -->
       <div class="cartao cartao-feed">
         <div class="cartao-cabecalho">
-          <h2>Transações chegando</h2>
-          <span class="cartao-sub">Cada transação é enviada ao modelo, que devolve o score na hora</span>
+          <h2>Tape de transações</h2>
+          <span class="cartao-sub">score + limite · histórico completo</span>
         </div>
-        <div class="tabela-rolagem feed-rolagem" id="feed-rolagem">
+        <div class="tape-rolagem">
           <table class="tabela">
             <thead>
-              <tr><th>Chegada</th><th>ID</th><th class="num">Valor</th><th class="num">Score</th><th>Decisão</th><th>Real</th><th>Resultado</th></tr>
+              <tr><th>ID</th><th class="num">Valor</th><th class="num">Score</th></tr>
             </thead>
-            <tbody id="feed">
-              <tr class="vazio"><td colspan="7">Clique em <strong>Iniciar simulação</strong> para começar.</td></tr>
+            <tbody id="feed-tape">
+              <tr><td colspan="3" style="text-align:center; color:#64748B;">Aguardando simulação...</td></tr>
             </tbody>
           </table>
         </div>
       </div>
 
-      <div class="cartao cartao-grafico">
+      <!-- Espaço Radar PCA (Centro) -->
+      <div class="cartao cartao-radar">
         <div class="cartao-cabecalho">
-          <h2>Score de anomalia</h2>
-          <span class="cartao-sub">Últimas 80 transações · pontos acima da linha viram alerta</span>
+          <h2>Espaço de anomalia · PCA</h2>
+          <span class="cartao-sub">Cada ponto é uma transação; fora do anel, o modelo dispara alerta</span>
         </div>
-        <div class="grafico-caixa"><canvas id="grafico-score" aria-label="Score de anomalia das últimas transações" role="img"></canvas></div>
-        <div class="legenda">
-          <span><i class="ponto ponto-normal"></i>Transação normal</span>
-          <span><i class="ponto ponto-fraude"></i>Fraude real</span>
-          <span><i class="traco"></i>Limite de decisão</span>
+        <div class="radar-caixa">
+          <canvas id="radar-canvas"></canvas>
         </div>
-        <div class="controle-limite">
-          <label for="limite">Limite de decisão: <strong id="limite-valor"></strong></label>
-          <input id="limite" type="range">
-          <div class="limite-extremos"><span>mais alertas</span><span>menos alertas</span></div>
-          <button id="btn-limite-padrao" class="botao botao-pequeno">Voltar ao limite do modelo</button>
-          <p class="cartao-sub">Baixar o limite pega mais fraudes, mas gera mais falsos alarmes. Os contadores são recalculados na hora.</p>
+        <div class="legenda-radar">
+          <span><i class="ponto-dot normal"></i>normal</span>
+          <span><i class="ponto-dot falso"></i>falso alarme</span>
+          <span><i class="ponto-dot fraude"></i>fraude</span>
+        </div>
+      </div>
+
+      <!-- Painel KPI Lateral (Direita) -->
+      <div class="cartao-kpis-lateral">
+        <div class="kpi-box destaque-verde">
+          <span class="kpi-box-rotulo">CAPITAL PROTEGIDO</span>
+          <span class="kpi-box-valor verde" id="kpi-lat-valor">R$ 0</span>
+          <span class="kpi-box-detalhe">100% do valor fraudado</span>
+        </div>
+
+        <div class="kpi-grid-2x2">
+          <div class="kpi-box">
+            <span class="kpi-box-rotulo">TRANSAÇÕES ANALISADAS</span>
+            <span class="kpi-box-valor ciano" id="kpi-lat-analisadas">0</span>
+          </div>
+          <div class="kpi-box">
+            <span class="kpi-box-rotulo">ALERTAS GERADOS</span>
+            <span class="kpi-box-valor ciano" id="kpi-lat-alertas">0</span>
+          </div>
+          <div class="kpi-box">
+            <span class="kpi-box-rotulo">FRAUDES DETECTADAS</span>
+            <span class="kpi-box-valor verde" id="kpi-lat-pegas">0</span>
+          </div>
+          <div class="kpi-box">
+            <span class="kpi-box-rotulo">FRAUDES NÃO DETECTADAS</span>
+            <span class="kpi-box-valor rosa" id="kpi-lat-passaram">0</span>
+          </div>
+        </div>
+
+        <div class="kpi-box">
+          <span class="kpi-box-rotulo">FALSOS ALARMES</span>
+          <span class="kpi-box-valor amarelo" id="kpi-lat-falsos">0</span>
+        </div>
+
+        <div class="kpi-box">
+          <span class="kpi-box-rotulo">LIMITE DE DECISÃO · <span id="kpi-corte-val">0.00</span></span>
+          <input id="limite-range" type="range" style="margin-top:6px;">
+          <div class="grupo-botoes" style="margin-top:8px;">
+            <button id="btn-rodar" class="botao botao-principal" style="width:100%;">Iniciar Simulação</button>
+            <button id="btn-reiniciar" class="botao">Reiniciar</button>
+          </div>
         </div>
       </div>
     </div>
   </section>
 
-  <!-- ============================== TESTAR ============================== -->
+  <!-- ============================== SIMULADOR ============================== -->
   <section id="aba-testar" class="aba" role="tabpanel" hidden>
     <div class="cartao">
       <div class="cartao-cabecalho">
-        <h2>Testar uma transação</h2>
-        <span class="cartao-sub">Sorteie uma transação real da demonstração e mexa nas colunas que o modelo usa para ver o score mudar.</span>
+        <h2>Simulador & Validador de Transações</h2>
+        <span class="cartao-sub">Ajuste os parâmetros PCA para observar o deslocamento no espaço de anomalias.</span>
       </div>
-      <div class="grupo-botoes">
-        <button id="btn-sortear-fraude" class="botao botao-principal">Sortear uma fraude</button>
-        <button id="btn-sortear-normal" class="botao">Sortear uma normal</button>
-        <button id="btn-restaurar" class="botao" disabled>Restaurar valores originais</button>
-      </div>
-
-      <div class="teste-grade">
+      <div class="simulador-grid">
         <div>
-          <dl class="teste-info">
-            <div><dt>Classe real</dt><dd id="teste-classe">—</dd></div>
-            <div><dt>Valor</dt><dd id="teste-valor">—</dd></div>
-            <div><dt>Hora</dt><dd id="teste-hora">—</dd></div>
-          </dl>
-          <h3>Colunas usadas pelo modelo</h3>
-          <p class="cartao-sub">As demais colunas ficam com os valores originais da transação.</p>
-          <div id="controles" class="controles">
+          <h3>Variáveis do modelo</h3>
+          <div id="controles-sim" class="controles-sliders">
             <p class="cartao-sub">Sorteie uma transação para começar.</p>
+          </div>
+          <div class="grupo-botoes" style="margin-top:14px;">
+            <button id="btn-sortear-fraude-sim" class="botao botao-principal">Sortear fraude real</button>
+            <button id="btn-sortear-normal-sim" class="botao">Sortear normal</button>
           </div>
         </div>
 
-        <div class="teste-resultado" aria-live="polite">
-          <p class="veredito" id="veredito">Nenhuma transação selecionada</p>
-          <p class="teste-score">Score: <strong id="teste-score">—</strong> · limite: <strong id="teste-limite">—</strong></p>
-          <div class="medidor" aria-hidden="true">
-            <div class="medidor-barra" id="medidor-barra"></div>
-            <div class="medidor-limite" id="medidor-limite"></div>
+        <div>
+          <span id="sim-badge" class="badge-status aprovada">Nenhuma transação selecionada</span>
+          <div class="score-destaque-box">
+            <div>
+              <span class="cartao-sub">SCORE DE ANOMALIA</span>
+              <div id="sim-score-num" class="score-numero normal">—</div>
+            </div>
+            <div style="text-align:right; font-family:var(--fonte-mono); font-size:11px; color:#8A99AD;">
+              corte: <strong id="sim-corte" style="color:#FFF;">—</strong>
+            </div>
           </div>
-          <div class="limite-extremos"><span>mais normal</span><span>mais suspeita</span></div>
-          <p class="cartao-sub">O score mede o quanto a transação foge do padrão das transações normais. Quando passa do limite, o modelo gera um alerta.</p>
         </div>
       </div>
     </div>
@@ -147,58 +169,223 @@
 
   <!-- ============================== RESULTADOS ============================== -->
   <section id="aba-resultados" class="aba" role="tabpanel" hidden>
-    {% if metricas %}
-    <div class="cartao">
-      <div class="cartao-cabecalho">
-        <h2>Avaliação final</h2>
-        <span class="cartao-sub">Conjunto de apresentação, usado uma única vez e que nenhum modelo viu no treino</span>
+    <!-- Topo: Cards de Destaque Executivo -->
+    <div class="grid-resultados-topo">
+      <div class="kpi-resultado-card destaque">
+        <span class="res-card-titulo">AUPRC · {{ nome_modelo }}</span>
+        <span class="res-card-valor ciano">0,665</span>
+        <span class="res-card-sub">+0,146 vs Isolation Forest (0,519)</span>
       </div>
-      <div class="tabela-rolagem">
-        <table class="tabela tabela-metricas">
-          <thead>
-            <tr>
-              <th>Modelo</th>
-              {% for rotulo in metricas.cabecalho %}<th class="num">{{ rotulo }}</th>{% endfor %}
-              <th class="num">Fraudes pegas</th><th class="num">Falsos alarmes</th><th class="num">Valor pego</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for modelo in metricas.modelos %}
-            <tr{% if modelo.escolhido %} class="linha-escolhida"{% endif %}>
-              <td>{{ modelo.nome }}{% if modelo.escolhido %} <span class="etiqueta">em uso</span>{% endif %}</td>
-              {% for valor in modelo.valores %}<td class="num">{{ valor }}</td>{% endfor %}
-              <td class="num">{{ modelo.fraudes_pegas }}</td><td class="num">{{ modelo.falsos_alarmes }}</td><td class="num">{{ modelo.valor_pego }}</td>
-            </tr>
-            {% endfor %}
-          </tbody>
-        </table>
+      <div class="kpi-resultado-card">
+        <span class="res-card-titulo">Recall</span>
+        <span class="res-card-valor">0,768</span>
+        <span class="res-card-sub">IF 0,758</span>
       </div>
-      <p class="cartao-sub">A acurácia fica perto de 99,8% para os dois modelos porque quase todas as transações são normais. A AUPRC é a métrica principal: um modelo aleatório tiraria cerca de 0,002.</p>
+      <div class="kpi-resultado-card">
+        <span class="res-card-titulo">Precision</span>
+        <span class="res-card-valor">0,468</span>
+        <span class="res-card-sub">IF 0,377</span>
+      </div>
+      <div class="kpi-resultado-card">
+        <span class="res-card-titulo">F1 Score</span>
+        <span class="res-card-valor">0,582</span>
+        <span class="res-card-sub">IF 0,503</span>
+      </div>
     </div>
-    {% endif %}
 
-    {% if graficos %}
-    <div class="galeria">
-      {% for arquivo, legenda in graficos %}
-      <figure class="cartao figura">
-        <a href="{% url 'monitor:grafico' arquivo %}" target="_blank" rel="noopener">
-          <img src="{% url 'monitor:grafico' arquivo %}" alt="{{ legenda }}" loading="lazy">
-        </a>
-        <figcaption>{{ legenda }} · clique para ampliar</figcaption>
-      </figure>
-      {% endfor %}
+    <!-- Comparativo Visual dos Modelos -->
+    <div class="grid-modelos-comparacao">
+      <!-- LOF -->
+      <div class="modelo-card-exec">
+        <div class="modelo-titulo-exec">
+          <span>LOF · em uso</span>
+          <span class="etiqueta">Principal</span>
+        </div>
+        <span class="cartao-sub">95 fraudes reais · cada quadrado é uma fraude</span>
+        <div class="grid-fraudes-visual" id="grid-fraudes-lof"></div>
+        <div style="display:flex; justify-content:space-between; font-size:11px; font-family:var(--fonte-mono);">
+          <span style="color:var(--verde-protegido);">73 capturadas</span>
+          <span style="color:var(--texto-suave);">22 escaparam</span>
+        </div>
+        <div style="margin-top:8px;">
+          <span class="res-card-titulo">Composição dos 156 Alertas</span>
+          <div class="barra-proporcao">
+            <div class="barra-segmento-fraude" style="width: 46.8%;"></div>
+            <div class="barra-segmento-alarme" style="width: 53.2%;"></div>
+          </div>
+          <div style="display:flex; justify-content:space-between; font-size:10px; color:var(--texto-suave); font-family:var(--fonte-mono);">
+            <span>73 fraudes</span>
+            <span>83 falsos alarmes</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Isolation Forest -->
+      <div class="modelo-card-exec">
+        <div class="modelo-titulo-exec">
+          <span>Isolation Forest</span>
+        </div>
+        <span class="cartao-sub">95 fraudes reais · cada quadrado é uma fraude</span>
+        <div class="grid-fraudes-visual" id="grid-fraudes-if"></div>
+        <div style="display:flex; justify-content:space-between; font-size:11px; font-family:var(--fonte-mono);">
+          <span style="color:var(--verde-protegido);">72 capturadas</span>
+          <span style="color:var(--texto-suave);">23 escaparam</span>
+        </div>
+        <div style="margin-top:8px;">
+          <span class="res-card-titulo">Composição dos 191 Alertas</span>
+          <div class="barra-proporcao">
+            <div class="barra-segmento-fraude" style="width: 37.7%;"></div>
+            <div class="barra-segmento-alarme" style="width: 62.3%;"></div>
+          </div>
+          <div style="display:flex; justify-content:space-between; font-size:10px; color:var(--texto-suave); font-family:var(--fonte-mono);">
+            <span>72 fraudes</span>
+            <span>119 falsos alarmes</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Outras Métricas -->
+      <div class="modelo-card-exec">
+        <div class="modelo-titulo-exec">
+          <span>Outras Métricas</span>
+        </div>
+        <div class="metricas-lista-outras" style="margin-top:6px;">
+          <div class="metrica-linha-item">
+            <span>Jaccard</span>
+            <span><strong>0,410</strong> &nbsp;·&nbsp; IF 0,336</span>
+          </div>
+          <div class="metrica-linha-item">
+            <span>ROC AUC</span>
+            <span><strong>0,930</strong> &nbsp;·&nbsp; IF 0,937</span>
+          </div>
+          <div class="metrica-linha-item">
+            <span>Acurácia</span>
+            <span><strong>0,998</strong> &nbsp;·&nbsp; IF 0,997</span>
+          </div>
+          <div class="metrica-linha-item">
+            <span>Valor Pego</span>
+            <span style="color:var(--verde-protegido);"><strong>74,3%</strong> &nbsp;·&nbsp; IF 72,6%</span>
+          </div>
+        </div>
+        <p class="cartao-sub" style="margin-top:auto;">Com apenas 0,17% de fraudes na base real, a AUPRC é o indicador principal de desempenho.</p>
+      </div>
     </div>
-    {% else %}
-    <div class="cartao"><p>Nenhum gráfico encontrado em <code>resultados/</code>. Rode o notebook 03_analise_completa.ipynb para gerá-los.</p></div>
-    {% endif %}
+
+    <!-- Painel de Gráficos Nativos -->
+    <div class="grid-graficos-canvas">
+      <div class="cartao-grafico-item grafico-clicavel" data-titulo="Curva ROC (Holdout)">
+        <div class="cartao-cabecalho">
+          <h2>Curva ROC <span class="hint-zoom"></span></h2>
+          <span class="cartao-sub">Conjunto de apresentação (holdout)</span>
+        </div>
+        <div class="box-canvas"><canvas id="chart-roc"></canvas></div>
+      </div>
+
+      <div class="cartao-grafico-item grafico-clicavel" data-titulo="Curva Precision-Recall">
+        <div class="cartao-cabecalho">
+          <h2>Curva precision-recall <span class="hint-zoom"></span></h2>
+          <span class="cartao-sub">Conjunto de apresentação · AUPRC é o indicador principal</span>
+        </div>
+        <div class="box-canvas"><canvas id="chart-pr"></canvas></div>
+      </div>
+
+      <div class="cartao-grafico-item grafico-clicavel" data-titulo="Matrizes de Confusão Comparadas">
+        <div class="cartao-cabecalho">
+          <h2>Matrizes de confusão</h2>
+          <span class="cartao-sub">Dois modelos no conjunto de apresentação</span>
+        </div>
+        <div class="matrizes-grid-visual">
+          <div class="matriz-bloco">
+            <span class="matriz-titulo">ISOLATION FOREST</span>
+            <div class="matriz-quadros">
+              <div class="m-quadro neg"><span class="m-val">56.532</span><span class="m-lbl">verdadeiro negativo</span></div>
+              <div class="m-quadro alarme"><span class="m-val">119</span><span class="m-lbl">falso alarme</span></div>
+              <div class="m-quadro perdida"><span class="m-val">23</span><span class="m-lbl">fraude perdida</span></div>
+              <div class="m-quadro capturada"><span class="m-val">72</span><span class="m-lbl">fraude capturada</span></div>
+            </div>
+          </div>
+          <div class="matriz-bloco">
+            <span class="matriz-titulo">LOF</span>
+            <div class="matriz-quadros">
+              <div class="m-quadro neg"><span class="m-val">56.568</span><span class="m-lbl">verdadeiro negativo</span></div>
+              <div class="m-quadro alarme"><span class="m-val">83</span><span class="m-lbl">falso alarme</span></div>
+              <div class="m-quadro perdida"><span class="m-val">22</span><span class="m-lbl">fraude perdida</span></div>
+              <div class="m-quadro capturada"><span class="m-val">73</span><span class="m-lbl">fraude capturada</span></div>
+            </div>
+          </div>
+        </div>
+        <span class="cartao-sub" style="margin-top:6px;">Linhas: classe real (normal, fraude) · colunas: previsto (normal, fraude)</span>
+      </div>
+
+      <div class="cartao-grafico-item grafico-clicavel" data-titulo="Melhor AUPRC por Subconjunto de Colunas">
+        <div class="cartao-cabecalho">
+          <h2>Melhor AUPRC por subconjunto de colunas <span class="hint-zoom"></span></h2>
+          <span class="cartao-sub">Validação · MI = informação mútua, Corr = correlação</span>
+        </div>
+        <div class="box-canvas"><canvas id="chart-subconjuntos"></canvas></div>
+      </div>
+
+      <div class="cartao-grafico-item grafico-clicavel" data-titulo="Recall: Fraudes Pegas vs Transações Revisadas">
+        <div class="cartao-cabecalho">
+          <h2>Recall: fraudes pegas <span class="hint-zoom"></span></h2>
+          <span class="cartao-sub">Conforme a fatia de transações revisadas</span>
+        </div>
+        <div class="box-canvas"><canvas id="chart-recall-fatia"></canvas></div>
+      </div>
+
+      <div class="cartao-grafico-item grafico-clicavel" data-titulo="Precision: Alertas que Eram Fraude">
+        <div class="cartao-cabecalho">
+          <h2>Precision: alertas que eram fraude <span class="hint-zoom"></span></h2>
+          <span class="cartao-sub">Conforme a fatia de transações revisadas</span>
+        </div>
+        <div class="box-canvas"><canvas id="chart-precision-fatia"></canvas></div>
+      </div>
+
+      <div class="cartao-grafico-item col-span-2 grafico-clicavel" data-titulo="Informação Mútua de cada Coluna com a Fraude">
+        <div class="cartao-cabecalho">
+          <h2>Informação mútua de cada coluna com a fraude <span class="hint-zoom"></span></h2>
+          <span class="cartao-sub">Treino · em destaque, o Top 10</span>
+        </div>
+        <div class="box-canvas"><canvas id="chart-info-mutua"></canvas></div>
+      </div>
+
+      <div class="cartao-grafico-item grafico-clicavel" data-titulo="Volume de Transações por Hora do Dia">
+        <div class="cartao-cabecalho">
+          <h2>Transações por hora do dia <span class="hint-zoom"></span></h2>
+          <span class="cartao-sub">Volume de transações</span>
+        </div>
+        <div class="box-canvas"><canvas id="chart-volume-hora"></canvas></div>
+      </div>
+
+      <div class="cartao-grafico-item grafico-clicavel" data-titulo="Taxa de Fraude por Hora do Dia">
+        <div class="cartao-cabecalho">
+          <h2>Taxa de fraude por hora do dia <span class="hint-zoom"></span></h2>
+          <span class="cartao-sub">% de fraude · picos às 2h e às 4h</span>
+        </div>
+        <div class="box-canvas"><canvas id="chart-taxa-hora"></canvas></div>
+      </div>
+    </div>
   </section>
 {% endif %}
 </main>
 
+<!-- Modal Lightbox para Ampliar Gráficos -->
+<div id="modal-grafico" class="modal-overlay" hidden>
+  <div class="modal-caixa">
+    <div class="modal-cabecalho">
+      <h3 id="modal-titulo">Visualização Ampliada</h3>
+      <button id="modal-fechar" class="botao-fechar">&times;</button>
+    </div>
+    <div class="modal-corpo">
+      <canvas id="modal-canvas"></canvas>
+    </div>
+  </div>
+</div>
+
 {% if not erro %}
 {{ config|json_script:"config" }}
 <script src="{% static 'monitor/chart.umd.js' %}"></script>
-<script src="{% static 'monitor/painel.js' %}?v=2"></script>
+<script src="{% static 'monitor/painel.js' %}?v=8"></script>
 {% endif %}
 </body>
 </html>

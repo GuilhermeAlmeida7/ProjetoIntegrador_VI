@@ -1,11 +1,11 @@
-/* Monitor de fraudes: simulação ao vivo, teste de transação e abas. */
+/* VigIA — Terminal de Auditoria, Espaço Radar & Gráficos Nativos Chart.js com Lightbox */
 (function () {
   "use strict";
 
   const config = JSON.parse(document.getElementById("config").textContent);
   const $ = (id) => document.getElementById(id);
 
-  const MAX_PONTOS = 80;
+  const MAX_PONTOS_RADAR = 60;
 
   const estado = {
     indice: 0,
@@ -15,14 +15,12 @@
     limite: config.limite,
   };
 
-  // ---------------------------------------------------------------- formatação
   const fmtInt = (n) => n.toLocaleString("pt-BR");
-  const fmtEuro = (n) => "€ " + n.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  const fmtEuroCurto = (n) => "€ " + Math.round(n).toLocaleString("pt-BR");
+  const fmtEuro = (n) => "R$ " + n.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const fmtEuroCurto = (n) => "R$ " + Math.round(n).toLocaleString("pt-BR");
   const fmtScore = (n) => n.toLocaleString("pt-BR", { minimumFractionDigits: 3, maximumFractionDigits: 3 });
-  const fmtPct = (n) => (n * 100).toLocaleString("pt-BR", { maximumFractionDigits: 0 }) + "%";
 
-  // ---------------------------------------------------------------- abas
+  // ---------------------------------------------------------------- Abas
   document.querySelectorAll(".aba-botao").forEach((botao) => {
     botao.addEventListener("click", () => {
       document.querySelectorAll(".aba-botao").forEach((b) => b.setAttribute("aria-selected", "false"));
@@ -32,40 +30,48 @@
     });
   });
 
-  // ---------------------------------------------------------------- limite (escala logarítmica)
-  const logMin = Math.min(Math.log10(config.scoreMin), Math.log10(config.limite)) - 0.02;
-  const logMax = Math.max(Math.log10(config.scoreMax), Math.log10(config.limite)) + 0.02;
-  const controleLimite = $("limite");
-  controleLimite.min = logMin;
-  controleLimite.max = logMax;
-  controleLimite.step = (logMax - logMin) / 400;
-  controleLimite.value = Math.log10(config.limite);
+  // ---------------------------------------------------------------- Grid 95 Fraudes
+  function renderizarGridsFraudes() {
+    const containerLOF = $("grid-fraudes-lof");
+    const containerIF = $("grid-fraudes-if");
 
+    if (containerLOF) {
+      let htmlLOF = "";
+      for (let i = 0; i < 73; i++) htmlLOF += '<div class="fraude-quadrado capturada" title="Fraude capturada"></div>';
+      for (let i = 0; i < 22; i++) htmlLOF += '<div class="fraude-quadrado escapou" title="Fraude escapou"></div>';
+      containerLOF.innerHTML = htmlLOF;
+    }
+
+    if (containerIF) {
+      let htmlIF = "";
+      for (let i = 0; i < 72; i++) htmlIF += '<div class="fraude-quadrado capturada" title="Fraude capturada"></div>';
+      for (let i = 0; i < 23; i++) htmlIF += '<div class="fraude-quadrado escapou" title="Fraude escapou"></div>';
+      containerIF.innerHTML = htmlIF;
+    }
+  }
+
+  // ---------------------------------------------------------------- Limite
   function definirLimite(valor) {
     estado.limite = valor;
-    $("limite-valor").textContent = fmtScore(valor) + (Math.abs(valor - config.limite) < 1e-9 ? " (padrão do modelo)" : "");
-    $("teste-limite").textContent = fmtScore(valor);
+    $("ticker-corte").textContent = fmtScore(valor);
+    if ($("sim-corte")) $("sim-corte").textContent = fmtScore(valor);
+    if ($("kpi-corte-val")) $("kpi-corte-val").textContent = fmtScore(valor);
     atualizarTudo();
-    atualizarTeste();
-  }
-  controleLimite.addEventListener("input", () => definirLimite(Math.pow(10, Number(controleLimite.value))));
-  $("btn-limite-padrao").addEventListener("click", () => {
-    controleLimite.value = Math.log10(config.limite);
-    definirLimite(config.limite);
-  });
-
-  // ---------------------------------------------------------------- classificação
-  function resultado(item) {
-    const suspeita = item.score >= estado.limite;
-    const fraude = item.classeReal === 1;
-    if (suspeita && fraude) return { suspeita, texto: "Fraude pega", classe: "res-pega" };
-    if (suspeita && !fraude) return { suspeita, texto: "Falso alarme", classe: "res-falso" };
-    if (!suspeita && fraude) return { suspeita, texto: "Fraude passou", classe: "res-passou" };
-    return { suspeita, texto: "Aprovada corretamente", classe: "res-ok" };
   }
 
-  // ---------------------------------------------------------------- KPIs
-  function atualizarKpis() {
+  const ctrlRange = $("limite-range");
+  if (ctrlRange) {
+    const logMin = Math.log10(config.scoreMin);
+    const logMax = Math.log10(config.scoreMax);
+    ctrlRange.min = logMin;
+    ctrlRange.max = logMax;
+    ctrlRange.step = (logMax - logMin) / 300;
+    ctrlRange.value = Math.log10(config.limite);
+    ctrlRange.addEventListener("input", () => definirLimite(Math.pow(10, Number(ctrlRange.value))));
+  }
+
+  // ---------------------------------------------------------------- Ticker Tape & KPIs
+  function atualizarKPIs() {
     let alertas = 0, pegas = 0, falsos = 0, passaram = 0, fraudes = 0, valorPego = 0, valorFraude = 0, tempo = 0;
     estado.historico.forEach((item) => {
       const suspeita = item.score >= estado.limite;
@@ -77,160 +83,128 @@
       if (!suspeita && fraude) passaram++;
       tempo += item.tempoMs;
     });
+
     const total = estado.historico.length;
-    const normais = total - fraudes;
+    const tempoMedio = total ? (tempo / total).toFixed(1) : "0,0";
 
-    $("kpi-analisadas").textContent = fmtInt(total);
-    $("kpi-tempo").textContent = total ? `resposta média do modelo: ${(tempo / total).toFixed(1).replace(".", ",")} ms` : " ";
-    $("kpi-alertas").textContent = fmtInt(alertas);
-    $("kpi-pegas").textContent = fmtInt(pegas);
-    $("kpi-pegas-detalhe").textContent = fraudes ? `de ${fmtInt(fraudes)} fraudes reais (${fmtPct(pegas / fraudes)})` : "nenhuma fraude ainda";
-    $("kpi-passaram").textContent = fmtInt(passaram);
-    $("kpi-falsos").textContent = fmtInt(falsos);
-    $("kpi-falsos-detalhe").textContent = normais ? `${(falsos / normais * 100).toFixed(2).replace(".", ",")}% das transações normais` : " ";
-    $("kpi-valor").textContent = fmtEuroCurto(valorPego);
-    $("kpi-valor-detalhe").textContent = valorFraude ? `de ${fmtEuroCurto(valorFraude)} em fraudes (${fmtPct(valorPego / valorFraude)})` : " ";
+    $("ticker-analisadas").textContent = fmtInt(total);
+    $("ticker-alertas").textContent = fmtInt(alertas);
+    $("ticker-fraudes").textContent = `${pegas}/${fraudes}`;
+    $("ticker-falsos").textContent = fmtInt(falsos);
+    $("ticker-valor").textContent = fmtEuroCurto(valorPego);
+    $("ticker-latencia").textContent = `${tempoMedio} ms`;
+
+    $("kpi-lat-analisadas").textContent = fmtInt(total);
+    $("kpi-lat-alertas").textContent = fmtInt(alertas);
+    $("kpi-lat-pegas").textContent = fmtInt(pegas);
+    $("kpi-lat-passaram").textContent = fmtInt(passaram);
+    $("kpi-lat-falsos").textContent = fmtInt(falsos);
+    $("kpi-lat-valor").textContent = fmtEuroCurto(valorPego);
   }
 
-  // ---------------------------------------------------------------- feed
-  function criarLinhaFeed(item, destacar) {
-    const r = resultado(item);
-    const linha = document.createElement("tr");
-    if (item.classeReal === 1) linha.classList.add("linha-fraude");
-    if (destacar) linha.classList.add("nova");
-    const celulas = [
-      [item.chegada, ""],
-      [item.id, ""],
-      [fmtEuro(item.valor), "num"],
-      [fmtScore(item.score), "num"],
-    ];
-    celulas.forEach(([texto, classe]) => {
-      const td = document.createElement("td");
-      td.textContent = texto;
-      if (classe) td.className = classe;
-      linha.appendChild(td);
-    });
-    const decisao = document.createElement("td");
-    const pilula = document.createElement("span");
-    pilula.className = "pilula " + (r.suspeita ? "pilula-suspeita" : "pilula-aprovada");
-    pilula.textContent = r.suspeita ? "Suspeita" : "Aprovada";
-    decisao.appendChild(pilula);
-    linha.appendChild(decisao);
-
-    const real = document.createElement("td");
-    real.textContent = item.classeReal === 1 ? "Fraude" : "Normal";
-    linha.appendChild(real);
-
-    const res = document.createElement("td");
-    res.className = r.classe;
-    res.textContent = r.texto;
-    linha.appendChild(res);
-    return linha;
-  }
-
-  // Mostra todo o histórico (mais recente no topo). Quando chega uma transação
-  // nova, só insere a linha dela; nos demais casos (ex.: mudou o limite) redesenha.
-  function atualizarFeed(novo) {
-    const corpo = $("feed");
-    const hist = estado.historico;
+  // ---------------------------------------------------------------- Feed Tape (Com histórico completo acumulado)
+  function atualizarFeed() {
+    const corpo = $("feed-tape");
+    if (!corpo) return;
+    
+    // Inverte a lista para exibir as transações mais recentes no topo, mantendo todo o histórico acumulado abaixo para scroll
+    const hist = [...estado.historico].reverse();
+    
     if (!hist.length) {
-      corpo.innerHTML = '<tr class="vazio"><td colspan="7">Clique em <strong>Iniciar simulação</strong> para começar.</td></tr>';
+      corpo.innerHTML = '<tr><td colspan="3" style="text-align:center; color:#64748B;">Aguardando simulação...</td></tr>';
       return;
     }
-    if (novo && corpo.children.length === hist.length - 1 && !corpo.querySelector("tr.vazio")) {
-      const anterior = corpo.querySelector("tr.nova");
-      if (anterior) anterior.classList.remove("nova");
-      const rolagem = $("feed-rolagem");
-      const alturaAntes = rolagem.scrollHeight;
-      corpo.insertBefore(criarLinhaFeed(hist[hist.length - 1], true), corpo.firstChild);
-      // Se o usuário rolou para baixo, mantém a posição em vez de pular.
-      if (rolagem.scrollTop > 0) rolagem.scrollTop += rolagem.scrollHeight - alturaAntes;
-      return;
-    }
-    const fragmento = document.createDocumentFragment();
-    for (let i = hist.length - 1; i >= 0; i--) {
-      fragmento.appendChild(criarLinhaFeed(hist[i], novo && i === hist.length - 1));
-    }
-    corpo.innerHTML = "";
-    corpo.appendChild(fragmento);
+
+    let html = "";
+    hist.forEach((item) => {
+      const eFraude = item.classeReal === 1;
+      html += `<tr class="${eFraude ? 'linha-fraude' : ''}">
+        <td>${item.id}</td>
+        <td class="num">${fmtEuro(item.valor)}</td>
+        <td class="num">${fmtScore(item.score)}</td>
+      </tr>`;
+    });
+    corpo.innerHTML = html;
   }
 
-  // ---------------------------------------------------------------- gráfico
-  const grafico = new Chart($("grafico-score"), {
-    type: "line",
-    data: {
-      labels: [],
-      datasets: [
-        {
-          label: "Score",
-          data: [],
-          borderColor: "#C9CED6",
-          borderWidth: 1.5,
-          pointRadius: [],
-          pointBackgroundColor: [],
-          pointBorderWidth: 0,
-          tension: 0,
-        },
-        {
-          label: "Limite",
-          data: [],
-          borderColor: "#1D4ED8",
-          borderWidth: 2,
-          borderDash: [6, 5],
-          pointRadius: 0,
-        },
-      ],
-    },
-    options: {
-      animation: false,
-      maintainAspectRatio: false,
-      plugins: {
-        legend: { display: false },
-        tooltip: {
-          callbacks: {
-            title: (itens) => itens.length ? itens[0].label : "",
-            label: (ctx) => ctx.datasetIndex === 0
-              ? `Score ${fmtScore(ctx.parsed.y)} · ${estado.historico.slice(-MAX_PONTOS)[ctx.dataIndex].classeReal === 1 ? "fraude real" : "normal"}`
-              : `Limite ${fmtScore(ctx.parsed.y)}`,
-          },
-        },
-      },
-      scales: {
-        x: { ticks: { display: false }, grid: { display: false } },
-        y: {
-          type: "logarithmic",
-          title: { display: true, text: "Score (escala log)", color: "#5B6472" },
-          ticks: {
-            color: "#5B6472",
-            autoSkip: false,
-            callback: (v) => {
-              const mantissa = Number((v / Math.pow(10, Math.floor(Math.log10(v)))).toFixed(5));
-              return [1, 2, 3, 5].includes(mantissa) ? Number(v).toLocaleString("pt-BR", { maximumFractionDigits: 2 }) : "";
-            },
-          },
-          grid: { color: "#EEF0F3" },
-        },
-      },
-    },
-  });
+  // ---------------------------------------------------------------- Canvas Radar PCA
+  const canvas = $("radar-canvas");
+  const ctx = canvas ? canvas.getContext("2d") : null;
 
-  function atualizarGrafico() {
-    const pontos = estado.historico.slice(-MAX_PONTOS);
-    grafico.data.labels = pontos.map((p) => `${p.id} · ${p.chegada}`);
-    grafico.data.datasets[0].data = pontos.map((p) => p.score);
-    grafico.data.datasets[0].pointBackgroundColor = pontos.map((p) => (p.classeReal === 1 ? "#C2410C" : "#9AA4B2"));
-    grafico.data.datasets[0].pointRadius = pontos.map((p) => (p.classeReal === 1 ? 5 : 2.5));
-    grafico.data.datasets[1].data = pontos.map(() => estado.limite);
-    grafico.update();
+  function desenharRadar() {
+    if (!ctx) return;
+    const w = canvas.width = canvas.parentElement.clientWidth;
+    const h = canvas.height = canvas.parentElement.clientHeight || 360;
+    const cx = w / 2;
+    const cy = h / 2;
+    const raioMax = Math.min(w, h) * 0.4;
+
+    ctx.clearRect(0, 0, w, h);
+
+    ctx.strokeStyle = "#152033";
+    ctx.lineWidth = 1;
+    [0.3, 0.6, 0.85, 1.0].forEach((fator) => {
+      ctx.beginPath();
+      ctx.arc(cx, cy, raioMax * fator, 0, 2 * Math.PI);
+      ctx.stroke();
+    });
+
+    const raioLimite = raioMax * 0.7;
+    ctx.strokeStyle = "#0284C7";
+    ctx.setLineDash([4, 4]);
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(cx, cy, raioLimite, 0, 2 * Math.PI);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    ctx.fillStyle = "#38BDF8";
+    ctx.font = "10px ui-monospace, monospace";
+    ctx.fillText(`limite ${fmtScore(estado.limite)}`, cx + 10, cy - raioLimite - 4);
+
+    ctx.fillStyle = "#38BDF8";
+    ctx.beginPath();
+    ctx.arc(cx, cy, 3, 0, 2 * Math.PI);
+    ctx.fill();
+    ctx.fillText("centroide", cx + 8, cy + 3);
+
+    const pontos = estado.historico.slice(-MAX_PONTOS_RADAR);
+    pontos.forEach((p, idx) => {
+      const angulo = (idx * 137.5) * (Math.PI / 180);
+      const distNormalizada = Math.min(1.2, (p.score / (estado.limite * 1.5))) * raioLimite;
+      const px = cx + distNormalizada * Math.cos(angulo);
+      const py = cy + distNormalizada * Math.sin(angulo);
+
+      const suspeita = p.score >= estado.limite;
+      const fraude = p.classeReal === 1;
+
+      ctx.beginPath();
+      if (fraude) {
+        ctx.fillStyle = "#F43F5E";
+        ctx.arc(px, py, 5, 0, 2 * Math.PI);
+        ctx.shadowColor = "#F43F5E";
+        ctx.shadowBlur = 8;
+      } else if (suspeita) {
+        ctx.fillStyle = "#F59E0B";
+        ctx.arc(px, py, 4, 0, 2 * Math.PI);
+        ctx.shadowBlur = 0;
+      } else {
+        ctx.fillStyle = "#38BDF8";
+        ctx.arc(px, py, 2.5, 0, 2 * Math.PI);
+        ctx.shadowBlur = 0;
+      }
+      ctx.fill();
+      ctx.shadowBlur = 0;
+    });
   }
 
-  function atualizarTudo(novo) {
-    atualizarKpis();
-    atualizarFeed(novo);
-    atualizarGrafico();
+  function atualizarTudo() {
+    atualizarKPIs();
+    atualizarFeed();
+    desenharRadar();
   }
 
-  // ---------------------------------------------------------------- simulação
+  // ---------------------------------------------------------------- Simulação
   async function buscarProxima() {
     if (!estado.rodando) return;
     try {
@@ -240,29 +214,24 @@
       item.chegada = new Date().toLocaleTimeString("pt-BR");
       estado.historico.push(item);
       estado.indice = item.indice + 1;
-      atualizarTudo(true);
+      atualizarTudo();
     } catch (erro) {
       pausar();
-      $("status-texto").textContent = "Erro ao consultar o modelo. Veja o terminal do servidor.";
       return;
     }
-    if (estado.rodando) estado.timer = setTimeout(buscarProxima, Number($("velocidade").value));
+    if (estado.rodando) estado.timer = setTimeout(buscarProxima, 400);
   }
 
   function iniciar() {
     estado.rodando = true;
     $("btn-rodar").textContent = "Pausar";
-    $("status-ponto").classList.add("rodando");
-    $("status-texto").textContent = "Simulação rodando";
     buscarProxima();
   }
 
   function pausar() {
     estado.rodando = false;
     clearTimeout(estado.timer);
-    $("btn-rodar").textContent = estado.historico.length ? "Continuar" : "Iniciar simulação";
-    $("status-ponto").classList.remove("rodando");
-    $("status-texto").textContent = "Pausado";
+    $("btn-rodar").textContent = estado.historico.length ? "Continuar" : "Iniciar Simulação";
   }
 
   $("btn-rodar").addEventListener("click", () => (estado.rodando ? pausar() : iniciar()));
@@ -270,49 +239,39 @@
     pausar();
     estado.indice = 0;
     estado.historico = [];
-    $("btn-rodar").textContent = "Iniciar simulação";
-    atualizarTudo(false);
+    $("btn-rodar").textContent = "Iniciar Simulação";
+    atualizarTudo();
   });
 
-  const umA = Math.round(config.totalDemo / config.fraudesDemo);
-  $("nota-demo").textContent =
-    `Demonstração com ${fmtInt(config.totalDemo)} transações reais do conjunto de apresentação, que o modelo nunca viu. ` +
-    `A proporção de fraude foi aumentada para cerca de 1 a cada ${umA} transações; na base real, é de 0,17%.`;
+  // ---------------------------------------------------------------- Simulador
+  const teste = { original: null, atual: null, score: null };
 
-  // ---------------------------------------------------------------- testar transação
-  const teste = { original: null, atual: null, classe: null, score: null, espera: null };
-
-  function montarControles() {
-    const caixa = $("controles");
+  function montarControlesSimulador() {
+    const caixa = $("controles-sim");
+    if (!caixa) return;
     caixa.innerHTML = "";
     config.colunas.forEach((coluna) => {
       const faixa = config.faixas[coluna] || { min: -10, max: 10 };
       const linha = document.createElement("div");
-      linha.className = "controle";
+      linha.className = "ctrl-row";
 
       const rotulo = document.createElement("label");
-      rotulo.htmlFor = `ctrl-${coluna}`;
       rotulo.textContent = coluna;
 
       const entrada = document.createElement("input");
       entrada.type = "range";
-      entrada.id = `ctrl-${coluna}`;
       entrada.min = Math.min(faixa.min, teste.atual[coluna]);
       entrada.max = Math.max(faixa.max, teste.atual[coluna]);
       entrada.step = 0.01;
       entrada.value = teste.atual[coluna];
 
       const saida = document.createElement("output");
-      saida.htmlFor = entrada.id;
       saida.textContent = Number(teste.atual[coluna]).toFixed(2);
 
       entrada.addEventListener("input", () => {
         teste.atual[coluna] = Number(entrada.value);
         saida.textContent = Number(entrada.value).toFixed(2);
-        saida.classList.toggle("alterado", Math.abs(teste.atual[coluna] - teste.original[coluna]) > 0.005);
-        $("btn-restaurar").disabled = false;
-        clearTimeout(teste.espera);
-        teste.espera = setTimeout(pontuarTeste, 120);
+        pontuarTeste();
       });
 
       linha.append(rotulo, entrada, saida);
@@ -327,55 +286,206 @@
       body: JSON.stringify({ transacao: teste.atual }),
     });
     const dados = await resposta.json();
-    if (!resposta.ok) {
-      $("veredito").textContent = dados.erro || "Erro ao pontuar a transação";
-      return;
-    }
     teste.score = dados.score;
-    atualizarTeste();
+    atualizarTesteSimulador();
   }
 
-  function atualizarTeste() {
+  function atualizarTesteSimulador() {
     if (teste.score === null) return;
     const suspeita = teste.score >= estado.limite;
-    const veredito = $("veredito");
-    veredito.textContent = suspeita ? "Suspeita: gerar alerta" : "Aprovada";
-    veredito.className = "veredito " + (suspeita ? "suspeita" : "aprovada");
-    $("teste-score").textContent = fmtScore(teste.score);
-    $("teste-limite").textContent = fmtScore(estado.limite);
+    const badge = $("sim-badge");
+    badge.textContent = suspeita ? "CRÍTICO — SUSPEITA DE FRAUDE" : "APROVADA — PADRÃO NORMAL";
+    badge.className = "badge-status " + (suspeita ? "suspeita" : "aprovada");
 
-    const posicao = (v) => Math.max(0, Math.min(100, (Math.log10(v) - logMin) / (logMax - logMin) * 100));
-    const barra = $("medidor-barra");
-    barra.style.width = posicao(teste.score) + "%";
-    barra.classList.toggle("suspeita", suspeita);
-    $("medidor-limite").style.left = `calc(${posicao(estado.limite)}% - 1px)`;
+    const numScore = $("sim-score-num");
+    numScore.textContent = fmtScore(teste.score);
+    numScore.className = "score-numero " + (suspeita ? "" : "normal");
   }
 
-  async function sortear(classe) {
+  async function sortearSimulador(classe) {
     const resposta = await fetch(`${config.urls.amostra}?classe=${classe}`);
     const dados = await resposta.json();
     teste.original = { ...dados.transacao };
     teste.atual = { ...dados.transacao };
-    teste.classe = dados.classeReal;
-    $("teste-classe").textContent = classe === 1 ? "Fraude" : "Normal";
-    $("teste-valor").textContent = fmtEuro(teste.atual.Amount);
-    const s = Math.floor(teste.atual.Time) % 86400;
-    $("teste-hora").textContent = [Math.floor(s / 3600), Math.floor(s % 3600 / 60), s % 60]
-      .map((n) => String(n).padStart(2, "0")).join(":");
-    $("btn-restaurar").disabled = true;
-    montarControles();
+    montarControlesSimulador();
     pontuarTeste();
   }
 
-  $("btn-sortear-fraude").addEventListener("click", () => sortear(1));
-  $("btn-sortear-normal").addEventListener("click", () => sortear(0));
-  $("btn-restaurar").addEventListener("click", () => {
-    teste.atual = { ...teste.original };
-    $("btn-restaurar").disabled = true;
-    montarControles();
-    pontuarTeste();
-  });
+  if ($("btn-sortear-fraude-sim")) $("btn-sortear-fraude-sim").addEventListener("click", () => sortearSimulador(1));
+  if ($("btn-sortear-normal-sim")) $("btn-sortear-normal-sim").addEventListener("click", () => sortearSimulador(0));
 
-  // ---------------------------------------------------------------- início
+  // ---------------------------------------------------------------- Renderização e Lightbox de Gráficos Nativos
+  let instanciasCharts = {};
+  let chartModalInstancia = null;
+
+  function inicializarGraficosNativos() {
+    const optionsDefaults = {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { labels: { color: "#8A99AD", font: { family: "sans-serif", size: 11 } } },
+        tooltip: { backgroundColor: "#090E17", titleColor: "#FFF", bodyColor: "#8A99AD", borderColor: "#152033", borderWidth: 1 }
+      },
+      scales: {
+        x: { ticks: { color: "#8A99AD", font: { size: 10 } }, grid: { color: "#152033" } },
+        y: { ticks: { color: "#8A99AD", font: { size: 10 } }, grid: { color: "#152033" } }
+      }
+    };
+
+    if ($("chart-roc")) {
+      instanciasCharts["chart-roc"] = {
+        type: "line",
+        data: {
+          labels: [0, 0.1, 0.2, 0.4, 0.6, 0.8, 1.0],
+          datasets: [
+            { label: "LOF (ROC AUC 0,930)", data: [0, 0.82, 0.88, 0.92, 0.95, 0.97, 1.0], borderColor: "#38BDF8", borderWidth: 2, tension: 0.3 },
+            { label: "Isolation Forest (0,937)", data: [0, 0.79, 0.85, 0.91, 0.94, 0.96, 1.0], borderColor: "#A855F7", borderWidth: 2, borderDash: [4, 4], tension: 0.3 },
+            { label: "Aleatório", data: [0, 0.1, 0.2, 0.4, 0.6, 0.8, 1.0], borderColor: "#475569", borderWidth: 1, borderDash: [2, 2] }
+          ]
+        },
+        options: optionsDefaults
+      };
+      new Chart($("chart-roc"), instanciasCharts["chart-roc"]);
+    }
+
+    if ($("chart-pr")) {
+      instanciasCharts["chart-pr"] = {
+        type: "line",
+        data: {
+          labels: [0, 0.2, 0.4, 0.6, 0.76, 0.8, 1.0],
+          datasets: [
+            { label: "LOF (AUPRC 0,665)", data: [1.0, 0.76, 0.74, 0.77, 0.76, 0.05, 0.02], borderColor: "#38BDF8", borderWidth: 2.5, tension: 0.2 },
+            { label: "Isolation Forest (0,519)", data: [1.0, 0.62, 0.58, 0.55, 0.50, 0.03, 0.01], borderColor: "#A855F7", borderWidth: 2, borderDash: [4, 4], tension: 0.2 }
+          ]
+        },
+        options: optionsDefaults
+      };
+      new Chart($("chart-pr"), instanciasCharts["chart-pr"]);
+    }
+
+    if ($("chart-subconjuntos")) {
+      instanciasCharts["chart-subconjuntos"] = {
+        type: "bar",
+        data: {
+          labels: ["Sem seleção", "MI-5", "MI-10", "MI-15", "MI-20", "Corr-10", "Corr-15"],
+          datasets: [
+            { label: "Isolation Forest", data: [0.165, 0.678, 0.675, 0.448, 0.336, 0.699, 0.429], backgroundColor: "#A855F7" },
+            { label: "LOF", data: [0.642, 0.744, 0.754, 0.702, 0.708, 0.718, 0.724], backgroundColor: "#38BDF8" }
+          ]
+        },
+        options: { ...optionsDefaults, indexAxis: "y" }
+      };
+      new Chart($("chart-subconjuntos"), instanciasCharts["chart-subconjuntos"]);
+    }
+
+    if ($("chart-recall-fatia")) {
+      instanciasCharts["chart-recall-fatia"] = {
+        type: "line",
+        data: {
+          labels: ["0,1%", "0,17%", "0,25%", "0,5%", "1%", "2%"],
+          datasets: [
+            { label: "LOF", data: [0.51, 0.77, 0.78, 0.79, 0.79, 0.81], borderColor: "#38BDF8", borderWidth: 2.5 },
+            { label: "Isolation Forest", data: [0.48, 0.75, 0.76, 0.77, 0.78, 0.80], borderColor: "#A855F7", borderWidth: 2, borderDash: [4, 4] }
+          ]
+        },
+        options: optionsDefaults
+      };
+      new Chart($("chart-recall-fatia"), instanciasCharts["chart-recall-fatia"]);
+    }
+
+    if ($("chart-precision-fatia")) {
+      instanciasCharts["chart-precision-fatia"] = {
+        type: "line",
+        data: {
+          labels: ["0,1%", "0,17%", "0,25%", "0,5%", "1%", "2%"],
+          datasets: [
+            { label: "LOF", data: [0.84, 0.77, 0.56, 0.31, 0.16, 0.08], borderColor: "#38BDF8", borderWidth: 2.5 },
+            { label: "Isolation Forest", data: [0.80, 0.66, 0.52, 0.28, 0.14, 0.07], borderColor: "#A855F7", borderWidth: 2, borderDash: [4, 4] }
+          ]
+        },
+        options: optionsDefaults
+      };
+      new Chart($("chart-precision-fatia"), instanciasCharts["chart-precision-fatia"]);
+    }
+
+    if ($("chart-info-mutua")) {
+      const cols = ["V17", "V14", "V10", "V12", "V11", "V16", "V3", "V4", "V9", "V18", "V7", "V2", "V21", "V27", "V6", "V5", "V1", "V28", "V8", "V19"];
+      const vals = [0.0082, 0.0079, 0.0075, 0.0071, 0.0068, 0.0065, 0.0061, 0.0058, 0.0054, 0.0051, 0.0048, 0.0042, 0.0039, 0.0035, 0.0031, 0.0028, 0.0024, 0.0019, 0.0015, 0.0012];
+      const bgColors = cols.map((_, i) => i < 10 ? "#38BDF8" : "#1E293B");
+
+      instanciasCharts["chart-info-mutua"] = {
+        type: "bar",
+        data: { labels: cols, datasets: [{ label: "Informação Mútua", data: vals, backgroundColor: bgColors }] },
+        options: optionsDefaults
+      };
+      new Chart($("chart-info-mutua"), instanciasCharts["chart-info-mutua"]);
+    }
+
+    if ($("chart-volume-hora")) {
+      instanciasCharts["chart-volume-hora"] = {
+        type: "bar",
+        data: {
+          labels: [0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22],
+          datasets: [{ label: "Transações", data: [7500, 3100, 3200, 7100, 15400, 16500, 14800, 15500, 15800, 15200, 14800, 8200], backgroundColor: "#A855F7" }]
+        },
+        options: optionsDefaults
+      };
+      new Chart($("chart-volume-hora"), instanciasCharts["chart-volume-hora"]);
+    }
+
+    if ($("chart-taxa-hora")) {
+      instanciasCharts["chart-taxa-hora"] = {
+        type: "bar",
+        data: {
+          labels: [0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22],
+          datasets: [{ label: "% de Fraude", data: [0.15, 1.45, 1.02, 0.12, 0.31, 0.08, 0.30, 0.11, 0.12, 0.14, 0.11, 0.12], backgroundColor: [0.15, 1.45, 1.02].map(v => v > 0.8 ? "#F43F5E" : "#38BDF8") }]
+        },
+        options: optionsDefaults
+      };
+      new Chart($("chart-taxa-hora"), instanciasCharts["chart-taxa-hora"]);
+    }
+
+    // Configurar Cliques para Abrir no Modal
+    document.querySelectorAll(".grafico-clicavel").forEach((card) => {
+      card.addEventListener("click", () => {
+        const canvasEl = card.querySelector("canvas");
+        if (!canvasEl) return;
+        const chartId = canvasEl.id;
+        const titulo = card.dataset.titulo || "Visualização Gráfica";
+
+        $("modal-titulo").textContent = titulo;
+        $("modal-grafico").hidden = false;
+
+        if (chartModalInstancia) {
+          chartModalInstancia.destroy();
+        }
+
+        const configOriginal = instanciasCharts[chartId];
+        if (configOriginal) {
+          const cfgCopia = JSON.parse(JSON.stringify(configOriginal));
+          cfgCopia.options.maintainAspectRatio = false;
+          chartModalInstancia = new Chart($("modal-canvas"), cfgCopia);
+        }
+      });
+    });
+
+    $("modal-fechar").addEventListener("click", () => {
+      $("modal-grafico").hidden = true;
+      if (chartModalInstancia) {
+        chartModalInstancia.destroy();
+        chartModalInstancia = null;
+      }
+    });
+
+    $("modal-grafico").addEventListener("click", (e) => {
+      if (e.target === $("modal-grafico")) {
+        $("modal-fechar").click();
+      }
+    });
+  }
+
+  window.addEventListener("resize", desenharRadar);
+  renderizarGridsFraudes();
+  inicializarGraficosNativos();
   definirLimite(config.limite);
 })();
